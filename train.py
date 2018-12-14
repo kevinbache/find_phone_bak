@@ -1,5 +1,7 @@
 from __future__ import division
 
+from tensorflow.python import keras
+
 import os
 import glob
 from enum import Enum
@@ -141,7 +143,7 @@ if __name__ == '__main__':
     # y_px, x_px = utils.get_image_size(data_dir)
     # print('y_px={}, x_px={}'.format(y_px, x_px))
 
-    y_px, x_px = 320, 480
+    y_px, x_px = (320, 480)
     resized_images_dir = os.path.join(data_dir, 'resized_h={}_w={}'.format(y_px, x_px))
     resize_images(data_dir, resized_images_dir, y_px, x_px)
 
@@ -153,11 +155,12 @@ if __name__ == '__main__':
 
     batch_size = 1
     lr = 0.001
-    num_epochs = 10
+    num_epochs = 3
 
     sigma = 0.0005
 
-    optimizer = keras.optimizers.Adam(lr=lr)
+    # optimizer = keras.optimizers.Adam(lr=lr)
+    optimizer = 'adam'
 
     x_info = read_x_data(resized_images_dir)
 
@@ -169,6 +172,7 @@ if __name__ == '__main__':
             continue
         y = make_gaussian_label_image(row['x'].values[0], row['y'].values[0], x_px, y_px, sigma)
         y = normalize(y)
+        y = np.concatenate([y[:, :, np.newaxis], 1 - y.copy()[:, :, np.newaxis]], axis=2)
         data_points.append(DataPoint(x=x, y=y, meta=file_name))
 
     data = train_valid_test_split(data_points, test_prob=0.15, valid_prob=0.15, random_state=seed)
@@ -183,12 +187,25 @@ if __name__ == '__main__':
     datagens_flow = {subset: flow_datagens(datagens, data[subset], batch_size)
                      for subset in DataSubsets}
 
+    steps_per_epoch = len(data[DataSubsets.train]) / batch_size / 10
+    # steps_per_epoch = 2
     history = model.fit_generator(
         datagens_flow[DataSubsets.train],
-        steps_per_epoch=len(data[DataSubsets.train]) / batch_size,
+        steps_per_epoch=steps_per_epoch,
         epochs=num_epochs,
         validation_data=datagens_flow[DataSubsets.valid],
         validation_steps=len(data[DataSubsets.valid]) / batch_size,
     )
 
     print(history)
+
+    for i, (x, y) in enumerate(datagens_flow[DataSubsets.train]):
+        print()
+        y_pred = model.predict(x)
+        print(y_pred.squeeze())
+        print(y.shape)
+        print(y_pred.shape)
+        print(y_pred.min(), y_pred.max(), y_pred.mean())
+        if i > 5:
+            break
+
