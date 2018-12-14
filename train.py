@@ -22,6 +22,12 @@ from tensorflow.python import keras
 import model as model_module
 import utils
 
+import os
+current_dir = os.path.dirname(os.path.realpath(__file__))
+
+import sys
+sys.path.append(current_dir)
+
 
 class DataSubsets(Enum):
     """Subsets of a data set"""
