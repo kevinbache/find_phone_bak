@@ -27,7 +27,8 @@ current_dir = os.path.dirname(os.path.realpath(__file__))
 
 import sys
 sys.path.append(current_dir)
-
+for p in sys.path:
+    print(p)
 
 class DataSubsets(Enum):
     """Subsets of a data set"""
