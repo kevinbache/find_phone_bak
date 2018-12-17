@@ -161,8 +161,20 @@ class PrintYsCallback(keras.callbacks.Callback):
             print(y_pred)
             print("y_true: ")
             print(y)
-            print('y_true min: {}, max: {}, mean: {}'.format(y_pred.min(), y_pred.max(), y_pred.mean()))
-            print('y_pred min: {}, max: {}, mean: {}'.format(y.min(), y.max(), y.mean()))
+            print('y_pred min: {}, max: {}, mean: {}'.format(
+                y_pred[:, :, 0].min(), y_pred[:, :, 0].max(), y_pred[:, :, 0].mean()))
+            col_maxes = y_pred[:, :, 0].argmax(axis=0)
+            col_max = col_maxes.argmax()
+            row_max = y_pred[:, col_max, 0].argmax()
+            print('y_pred max location: row={}, col={}'.format(row_max, col_max))
+
+            col_maxes = y[:, :, 0].argmax(axis=0)
+            col_max = col_maxes.argmax()
+            row_max = y[:, col_max, 0].argmax()
+            print('y max location: row={}, col={}'.format(row_max, col_max))
+
+            print('y_true min: {}, max: {}, mean: {}'.format(
+                y[:, :, 0].min(), y[:, :, 0].max(), y[:, :, 0].mean()))
             print()
             print()
 
@@ -265,8 +277,9 @@ if __name__ == '__main__':
                      for subset in DataSubsets}
     x_valid_show = []
     y_valid_show = []
+    num_images_to_show = 2
     for i, (x, y) in enumerate(datagens_flow[DataSubsets.valid]):
-        if i >= 3:
+        if i >= num_images_to_show:
             break
         x_valid_show.append(x)
         y_valid_show.append(y)
@@ -276,7 +289,6 @@ if __name__ == '__main__':
                      for subset in DataSubsets}
 
     steps_per_epoch = len(data[DataSubsets.train]) / batch_size
-    # steps_per_epoch = 2
     history = model.fit_generator(
         datagens_flow[DataSubsets.train],
         steps_per_epoch=steps_per_epoch,
