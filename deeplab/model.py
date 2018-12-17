@@ -39,6 +39,7 @@ from keras.layers import Conv2D
 from keras.layers import DepthwiseConv2D
 from keras.layers import ZeroPadding2D
 from keras.layers import AveragePooling2D
+from keras.layers import Softmax
 from keras.engine import Layer
 from keras.engine import InputSpec
 from keras.engine.topology import get_source_inputs
@@ -494,6 +495,7 @@ def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3)
 
     x = Conv2D(classes, (1, 1), padding='same', name=last_layer_name)(x)
     x = BilinearUpsampling(output_size=(input_shape[0], input_shape[1]))(x)
+    x = Softmax()(x)
 
     # Ensure that the model takes into account
     # any potential predecessors of `input_tensor`.
@@ -505,7 +507,6 @@ def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3)
     model = Model(inputs, x, name='deeplabv3plus')
 
     # load weights
-
     if weights == 'pascal_voc':
         if backbone == 'xception':
             weights_path = get_file('deeplabv3_xception_tf_dim_ordering_tf_kernels.h5',

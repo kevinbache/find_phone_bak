@@ -90,10 +90,10 @@ def list_of_images_to_4d_array(list_of_image_arrays):
 
 def make_datagens(data_points):
     data_gen_args = dict(
-        rotation_range=90.,
+        rotation_range=10.,
         width_shift_range=0.1,
         height_shift_range=0.1,
-        zoom_range=0.2,
+        zoom_range=0.1,
     )
 
     x_datagen = keras.preprocessing.image.ImageDataGenerator(
@@ -114,7 +114,7 @@ def make_datagens(data_points):
     return [x_datagen, y_datagen]
 
 
-def flow_datagens(datagens, data_points, batch_size):
+def flow_datagens(datagens, data_points, batch_size, seed=1234):
     iters = [
         datagens[0].flow(
             list_of_images_to_4d_array([dp.x for dp in data_points]),
@@ -123,10 +123,12 @@ def flow_datagens(datagens, data_points, batch_size):
             #     np.array([dp.meta for dp in data_points]),
             # ),
             batch_size=batch_size,
+            seed=seed,
         ),
         datagens[1].flow(
             list_of_images_to_4d_array([dp.y for dp in data_points]),
             batch_size=batch_size,
+            seed=seed,
         )
     ]
     return zip(*iters)
@@ -143,7 +145,39 @@ def train_valid_test_split(data_points, test_prob, valid_prob, random_state=1234
     }
 
 
-CALLBACK_NAME = 'model_checkoint_weights.{epoch:02d}-{val_loss:.2f}.hdf5'
+MODEL_CHECKPOINT_NAME = 'model_checkpoint_weights.{epoch:02d}-{val_loss:.2f}.hdf5'
+
+
+from matplotlib import pyplot as plt
+
+
+class SaveYsCallback(keras.callbacks.Callback):
+    OUTPUT_IMAGE_TEMPLATE = 'training_progress_epoch={}_img={}.jpg'
+
+    def __init__(self, output_path, x_images, y_images):
+        self.x_images = x_images
+        self.y_images = y_images
+        self.output_path = output_path
+        utils.mkdir_if_not_exist(self.output_path)
+
+    def on_epoch_end(self, epoch, logs=None):
+        for i, (x, y) in enumerate(zip(self.x_images, self.y_images)):
+            out_path = os.path.join(self.output_path, self.OUTPUT_IMAGE_TEMPLATE.format(epoch, i))
+            print("Saving image {} of {} to {}".format(i, len(self.x_images)-1, out_path))
+            y_pred = self.model.predict(x)
+            f, ax = plt.subplots(1, 3)
+
+            x = x.squeeze()
+            for ci in range(x.shape[2]):
+                channel = x[:, :, ci]
+                channel -= channel.min()
+                x[:, :, ci] = normalize(channel)
+
+            ax[0].imshow(x)
+            ax[1].imshow(y_pred[0, :, :, 0])
+            ax[2].imshow(y[0, :, :, 0])
+            f.savefig(out_path)
+            plt.close()
 
 
 class PrintYsCallback(keras.callbacks.Callback):
@@ -151,30 +185,55 @@ class PrintYsCallback(keras.callbacks.Callback):
         self.x_images = x_images
         self.y_images = y_images
 
+    @staticmethod
+    def _find_max_location_normed(array):
+        col_maxes = array.max(axis=0)
+        row_maxes = array.max(axis=1)
+        return (row_maxes.argmax(), col_maxes.argmax()), \
+               (row_maxes.argmax() / len(row_maxes), col_maxes.argmax() / len(col_maxes))
+
     def on_epoch_end(self, epoch, logs=None):
         for i, (x, y) in enumerate(zip(self.x_images, self.y_images)):
             print("==========================")
             print(" Starting image {} of {}".format(i, len(self.x_images)))
             print("==========================")
             y_pred = self.model.predict(x)
+
+            y_pred = y_pred.squeeze()
+            y = y.squeeze()
+
             print("y_pred: ")
             print(y_pred)
             print("y_true: ")
             print(y)
-            print('y_pred min: {}, max: {}, mean: {}'.format(
-                y_pred[:, :, 0].min(), y_pred[:, :, 0].max(), y_pred[:, :, 0].mean()))
-            col_maxes = y_pred[:, :, 0].argmax(axis=0)
-            col_max = col_maxes.argmax()
-            row_max = y_pred[:, col_max, 0].argmax()
-            print('y_pred max location: row={}, col={}'.format(row_max, col_max))
 
-            col_maxes = y[:, :, 0].argmax(axis=0)
-            col_max = col_maxes.argmax()
-            row_max = y[:, col_max, 0].argmax()
-            print('y max location: row={}, col={}'.format(row_max, col_max))
+            y_pred0 = y_pred[:, :, 0]
+            y_pred1 = y_pred[:, :, 1]
+            y0 = y[:, :, 0]
+            y1 = y[:, :, 1]
 
-            print('y_true min: {}, max: {}, mean: {}'.format(
-                y[:, :, 0].min(), y[:, :, 0].max(), y[:, :, 0].mean()))
+            print('y_pred[:,:,0] shape: {}, min: {}, max: {}, mean: {}'.format(
+                y_pred0.shape, y_pred0.min(), y_pred0.max(), y_pred0.mean()))
+            print('y_pred[:,:,1] shape: {}, min: {}, max: {}, mean: {}'.format(
+                y_pred1.shape, y_pred1.min(), y_pred1.max(), y_pred1.mean()))
+            print()
+
+            print('y_true[:,:,0] shape: {}, min: {}, max: {}, mean: {}'.format(
+                y0.shape, y0.min(), y0.max(), y0.mean()))
+            print('y_true[:,:,1] shape: {}, min: {}, max: {}, mean: {}'.format(
+                y1.shape, y1.min(), y1.max(), y1.mean()))
+            print()
+
+            print('y_pred[:,:,0] max location: row, col = {}, yx = {}'.format(
+                *self._find_max_location_normed(y_pred0)))
+            print('y_pred[:,:,1] max location: row, col = {}, yx = {}'.format(
+                *self._find_max_location_normed(y_pred1)))
+            print()
+
+            print('y[:,:,0] max location: row, col = {}, yx = {}'.format(
+                *self._find_max_location_normed(y0)))
+            print('y[:,:,1] max location: row, col = {}, yx = {}'.format(
+                *self._find_max_location_normed(y1)))
             print()
             print()
 
@@ -185,7 +244,7 @@ def get_callbacks(output_dir, x_valid, y_valid):
         keras_addons.ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=patience, min_lr=1e-6),
         keras_addons.ReduceLROnPlateau(monitor='val_loss', factor=1000, patience=patience * 2, min_lr=1e-6),
         keras.callbacks.ModelCheckpoint(
-            os.path.join(output_dir, CALLBACK_NAME),
+            os.path.join(output_dir, MODEL_CHECKPOINT_NAME),
             monitor='val_loss',
             verbose=0,
             save_best_only=False,
@@ -202,6 +261,7 @@ def get_callbacks(output_dir, x_valid, y_valid):
             # restore_best_weights=False
         ),
         PrintYsCallback(x_valid, y_valid),
+        SaveYsCallback(os.path.join(output_dir, 'progress_images'), x_valid, y_valid),
     ]
     return callbacks
 
@@ -242,7 +302,6 @@ if __name__ == '__main__':
 
     x_info = read_x_data(resized_images_dir)
 
-
     # create y data
     data_points = []
     for file_name, x in x_info:
@@ -251,7 +310,8 @@ if __name__ == '__main__':
             continue
         y = make_gaussian_label_image(row['x'].values[0], row['y'].values[0], x_px, y_px, sigma)
         y = normalize(y)
-        y = np.concatenate([y[:, :, np.newaxis], 1 - y.copy()[:, :, np.newaxis]], axis=2)
+        y = y[:, :, np.newaxis]
+        y = np.concatenate([y, 1 - y.copy()], axis=2)
         data_points.append(DataPoint(x=x, y=y, meta=file_name))
 
     data = train_valid_test_split(data_points, test_prob=0.15, valid_prob=0.15, random_state=seed)
@@ -264,7 +324,7 @@ if __name__ == '__main__':
     if do_load_model:
         keras_addons.load_model(os.path.join(
             output_dir,
-            CALLBACK_NAME.format(
+            MODEL_CHECKPOINT_NAME.format(
                 epoch=12,
                 val_loss=0.06,
             ))
@@ -273,7 +333,7 @@ if __name__ == '__main__':
     datagens = make_datagens(data[DataSubsets.train])
 
     # create images to print in callback
-    datagens_flow = {subset: flow_datagens(datagens, data[subset], 1)
+    datagens_flow = {subset: flow_datagens(datagens, data[subset], 1, seed)
                      for subset in DataSubsets}
     x_valid_show = []
     y_valid_show = []
@@ -285,10 +345,11 @@ if __name__ == '__main__':
         y_valid_show.append(y)
 
     # reset data generators
-    datagens_flow = {subset: flow_datagens(datagens, data[subset], batch_size)
+    datagens_flow = {subset: flow_datagens(datagens, data[subset], batch_size, seed)
                      for subset in DataSubsets}
 
-    steps_per_epoch = len(data[DataSubsets.train]) / batch_size
+    # steps_per_epoch = len(data[DataSubsets.train]) / batch_size
+    steps_per_epoch = 2
     history = model.fit_generator(
         datagens_flow[DataSubsets.train],
         steps_per_epoch=steps_per_epoch,
