@@ -265,7 +265,7 @@ if __name__ == '__main__':
                      for subset in DataSubsets}
     x_valid_show = []
     y_valid_show = []
-    for i, (x, y) in datagens_flow[DataSubsets.valid]:
+    for i, (x, y) in enumerate(datagens_flow[DataSubsets.valid]):
         if i >= 3:
             break
         x_valid_show.append(x)
