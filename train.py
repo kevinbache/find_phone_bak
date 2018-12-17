@@ -161,7 +161,8 @@ class PrintYsCallback(keras.callbacks.Callback):
             print(y_pred)
             print("y_true: ")
             print(y)
-            print('min: {}, max: {}, mean: {}'.format(y_pred.min(), y_pred.max(), y_pred.mean()))
+            print('y_true min: {}, max: {}, mean: {}'.format(y_pred.min(), y_pred.max(), y_pred.mean()))
+            print('y_pred min: {}, max: {}, mean: {}'.format(y.min(), y.max(), y.mean()))
             print()
             print()
 
@@ -196,6 +197,7 @@ def get_callbacks(output_dir, x_valid, y_valid):
 if __name__ == '__main__':
     data_dir = './data/'
     do_resize = False
+    do_load_model = False
 
     df = pd.read_csv(os.path.join(data_dir, 'labels.txt'), delimiter=' ')
     df.columns = ['image', 'x', 'y']
@@ -247,13 +249,14 @@ if __name__ == '__main__':
     seed = 1234
 
     model = model_module.build_compile(optimizer, y_px, x_px)
-    keras_addons.load_model(os.path.join(
-        output_dir,
-        CALLBACK_NAME.format(
-            epoch=12,
-            val_loss=0.06,
-        ))
-    )
+    if do_load_model:
+        keras_addons.load_model(os.path.join(
+            output_dir,
+            CALLBACK_NAME.format(
+                epoch=12,
+                val_loss=0.06,
+            ))
+        )
 
     datagens = make_datagens(data[DataSubsets.train])
 
