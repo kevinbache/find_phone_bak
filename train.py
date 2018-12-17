@@ -183,6 +183,7 @@ if __name__ == '__main__':
     resize_images(data_dir, resized_images_dir, y_px, x_px)
 
     output_dir = os.path.join(data_dir, 'training_output')
+    utils.mkdir_if_not_exist(output_dir)
 
     # labels_dir = os.path.join(data_dir, 'label_images')
     # utils.mkdir_if_not_exist(labels_dir)
