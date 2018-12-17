@@ -20,8 +20,7 @@ from sklearn.model_selection import train_test_split
 # import keras
 # from tensorflow.python.keras import callbacks
 # from keras import callbacks
-
-
+import keras_addons
 import model as model_module
 import utils
 
@@ -147,8 +146,8 @@ def train_valid_test_split(data_points, test_prob, valid_prob, random_state=1234
 def get_callbacks(output_dir):
     patience = 10
     callbacks = [
-        keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=patience, min_lr=1e-6),
-        keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=1000, patience=patience * 2, min_lr=1e-6),
+        keras_addons.ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=patience, min_lr=1e-6),
+        keras_addons.ReduceLROnPlateau(monitor='val_loss', factor=1000, patience=patience * 2, min_lr=1e-6),
         keras.callbacks.ModelCheckpoint(
             os.path.join(output_dir, 'model_checkoint_weights.{epoch:02d}-{val_loss:.2f}.hdf5'),
             monitor='val_loss',
