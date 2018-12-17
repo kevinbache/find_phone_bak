@@ -4,6 +4,21 @@ import warnings
 
 from keras import callbacks
 from keras import backend as K
+import keras
+
+
+from deeplab.model import relu6, BilinearUpsampling
+
+
+def load_model(model_path):
+    return keras.models.load_model(
+        model_path,
+        custom_objects={
+            'relu6': relu6,
+            'BilinearUpsampling': BilinearUpsampling
+        }
+    )
+
 
 
 class ReduceLROnPlateau(callbacks.Callback):
