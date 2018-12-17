@@ -16,8 +16,11 @@ from scipy.stats import multivariate_normal
 from skimage import io
 from sklearn.model_selection import train_test_split
 
-from tensorflow.python import keras
+# from tensorflow.python import keras
 # import keras
+# from tensorflow.python.keras import callbacks
+# from keras import callbacks
+
 
 import model as model_module
 import utils
@@ -141,6 +144,32 @@ def train_valid_test_split(data_points, test_prob, valid_prob, random_state=1234
     }
 
 
+def get_callbacks(output_dir):
+    patience = 10
+    callbacks = [
+        keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=patience, min_lr=1e-6),
+        keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=1000, patience=patience * 2, min_lr=1e-6),
+        keras.callbacks.ModelCheckpoint(
+            os.path.join(output_dir, 'model_checkoint_weights.{epoch:02d}-{val_loss:.2f}.hdf5'),
+            monitor='val_loss',
+            verbose=0,
+            save_best_only=False,
+            save_weights_only=False,
+            mode='auto',
+            period=1),
+        keras.callbacks.EarlyStopping(
+            monitor='val_loss',
+            min_delta=0,
+            patience=30,
+            verbose=1,
+            mode='auto',
+            # baseline=None,
+            # restore_best_weights=False
+        ),
+    ]
+    return callbacks
+
+
 if __name__ == '__main__':
     data_dir = './data/'
 
@@ -153,6 +182,8 @@ if __name__ == '__main__':
     y_px, x_px = (320, 480)
     resized_images_dir = os.path.join(data_dir, 'resized_h={}_w={}'.format(y_px, x_px))
     resize_images(data_dir, resized_images_dir, y_px, x_px)
+
+    output_dir = os.path.join(data_dir, 'training_output')
 
     # labels_dir = os.path.join(data_dir, 'label_images')
     # utils.mkdir_if_not_exist(labels_dir)
@@ -194,6 +225,7 @@ if __name__ == '__main__':
     datagens_flow = {subset: flow_datagens(datagens, data[subset], batch_size)
                      for subset in DataSubsets}
 
+
     steps_per_epoch = len(data[DataSubsets.train]) / batch_size
     # steps_per_epoch = 2
     history = model.fit_generator(
@@ -202,6 +234,7 @@ if __name__ == '__main__':
         epochs=num_epochs,
         validation_data=datagens_flow[DataSubsets.valid],
         validation_steps=len(data[DataSubsets.valid]) / batch_size,
+        callbacks = get_callbacks(output_dir),
     )
 
     print(history)
