@@ -129,7 +129,7 @@ def train_valid_test_split(data_points, test_prob, valid_prob, random_state=1234
     }
 
 
-MODEL_CHECKPOINT_NAME = 'model_checkpoint_weights.{epoch:02d}-{val_loss:.2f}.hdf5'
+MODEL_CHECKPOINT_NAME = 'model_checkpoint_weights.{epoch:02d}.hdf5'
 
 
 def get_callbacks(output_dir, x_valid, y_valid):
@@ -167,6 +167,9 @@ def build_compile(optimizer, input_height=360, input_width=480, num_classes=2, e
 
 
 if __name__ == '__main__':
+    ##############
+    # PARAMETERS #
+    ##############
     data_dir = './data/'
     do_resize = False
     load_resized = False
@@ -175,32 +178,26 @@ if __name__ == '__main__':
     df = pd.read_csv(os.path.join(data_dir, 'labels.txt'), delimiter=' ')
     df.columns = ['image', 'x', 'y']
 
-    y_px, x_px = utils.get_image_size(data_dir)
-    # print('y_px={}, x_px={}'.format(y_px, x_px))
-
-    # y_px, x_px = (320, 480)
-    resized_images_dir = os.path.join(data_dir, 'resized_h={}_w={}'.format(y_px, x_px))
-    if do_resize:
-        resize_images(data_dir, resized_images_dir, y_px, x_px)
-
     train_output_dir = os.path.join(current_dir, 'train_output')
     utils.mkdir_if_not_exist(train_output_dir)
-
-    num_classes = 2
-    seed = 1234
 
     batch_size = 1
     lr = 1e-3
     num_epochs = 3
+    optimizer = 'adam'
+    # you can't actually change the num_classes parameter because the two-class setup
+    # is baked into y data generation
+    num_classes = 2
+    seed = 1234
 
     sigma = 0.0005
 
-    optimizer = 'adam'
-
+    ########
+    # DATA #
+    ########
     # read x data
-    x_dir = resized_images_dir if load_resized else data_dir
-    x_info = read_x_data(x_dir)
-    y_px, x_px = utils.get_image_size(x_dir)
+    x_info = read_x_data(data_dir)
+    y_px, x_px = utils.get_image_size(data_dir)
 
     # create matching y data
     data_points = []
@@ -211,20 +208,11 @@ if __name__ == '__main__':
         y = make_gaussian_label_image(row['x'].values[0], row['y'].values[0], x_px, y_px, sigma)
         y = utils.normalize(y)
         y = y[:, :, np.newaxis]
+        # note that this hard codes two classes
         y = np.concatenate([y, 1 - y.copy()], axis=2)
         data_points.append(DataPoint(x=x, y=y, meta=file_name))
 
     data = train_valid_test_split(data_points, test_prob=0.15, valid_prob=0.15, random_state=seed)
-
-    model = build_compile(optimizer, y_px, x_px, extra_metrics=[keras_addons.mode_distance])
-    # if do_load_model:
-    #     keras_addons.load_model(os.path.join(
-    #         output_dir,
-    #         MODEL_CHECKPOINT_NAME.format(
-    #             epoch=12,
-    #             val_loss=0.06,
-    #         ))
-    #     )
 
     datagens = make_datagens(data[DataSubsets.train])
     datagens_filename = os.path.join(train_output_dir, 'datagens.pkl')
@@ -242,29 +230,37 @@ if __name__ == '__main__':
         x_valid_show.append(x)
         y_valid_show.append(y)
 
-    # reset data generators
+    # reset data generators for training
     datagens_flow = {subset: flow_datagens(datagens, data[subset], batch_size, seed)
                      for subset in DataSubsets}
 
-    steps_per_epoch = len(data[DataSubsets.train]) / batch_size
+    ####################
+    # MODEL / TRAINING #
+    ####################
+    model = build_compile(optimizer, y_px, x_px, extra_metrics=[keras_addons.mode_distance])
+    # if do_load_model:
+    #     keras_addons.load_model(os.path.join(
+    #         output_dir,
+    #         MODEL_CHECKPOINT_NAME.format(
+    #             epoch=12,
+    #             val_loss=0.06,
+    #         ))
+    #     )
+
     history = model.fit_generator(
         datagens_flow[DataSubsets.train],
-        steps_per_epoch=steps_per_epoch,
+        steps_per_epoch=len(data[DataSubsets.train]) / batch_size,
         epochs=num_epochs,
         validation_data=datagens_flow[DataSubsets.valid],
         validation_steps=len(data[DataSubsets.valid]) / batch_size,
         callbacks=get_callbacks(train_output_dir, x_valid_show, y_valid_show),
     )
 
-    print(history)
-
-    for i, (x, y) in enumerate(datagens_flow[DataSubsets.train]):
-        print()
-        y_pred = model.predict(x)
-        print(y_pred.squeeze())
-        print(y.shape)
-        print(y_pred.shape)
-        print(y_pred.min(), y_pred.max(), y_pred.mean())
-        if i >= 0:
-            break
-
+    dists = []
+    for dp in data[DataSubsets.test]:
+        y_pred = model.predict(datagens[0].standardize(dp.x), batch_size=1)
+        dist = keras_addons.mode_distance(dp.y, y_pred)
+        dists.append(dist)
+    print("Test set distances:")
+    print(dists)
+    print('Mean distance: {}'.format(np.mean(dists)))
