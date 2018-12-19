@@ -22,11 +22,12 @@ def suppress_stdout_stderr():
             yield (err, out)
 
 
-# suppress "Using TensorFlow backend." message
+# the context manager is to suppress the "Using TensorFlow backend." message which Keras spits out
 with suppress_stdout_stderr():
     import keras_addons
     import train_phone_finder
     import utils
+
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
