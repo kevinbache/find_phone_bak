@@ -1,36 +1,28 @@
 from __future__ import division
 
-from tensorflow.python import keras
-
 import os
+import sys
+current_dir = os.path.dirname(os.path.realpath(__file__))
+sys.path.append(current_dir)
+for p in sys.path:
+    print(p)
+
 import glob
 from enum import Enum
 from collections import namedtuple
 
 from PIL import Image
-
 import numpy as np
 import pandas as pd
-
+from matplotlib import pyplot as plt
 from scipy.stats import multivariate_normal
 from skimage import io
 from sklearn.model_selection import train_test_split
+from tensorflow.python import keras
 
-# from tensorflow.python import keras
-# import keras
-# from tensorflow.python.keras import callbacks
-# from keras import callbacks
+from deeplab.model import Deeplabv3
 import keras_addons
-import model as model_module
 import utils
-
-import os
-current_dir = os.path.dirname(os.path.realpath(__file__))
-
-import sys
-sys.path.append(current_dir)
-for p in sys.path:
-    print(p)
 
 
 class DataSubsets(Enum):
@@ -55,7 +47,10 @@ def resize_images(input_dir, output_dir, new_height, new_width):
 
 
 def make_gaussian_label_image(mu_x, mu_y, num_x_px, num_y_px, var=0.05):
-    """make a 1-d label image of shape (num_y_px, num_x_px) with a gaussian of size defined by var """
+    """
+    make a 1-channel label image of shape (num_y_px, num_x_px) with a gaussian blob at location
+    mu with size defined by var
+    """
     x = np.linspace(0, 1, num_x_px)
     y = np.linspace(0, 1, num_y_px)
     xs, ys = np.meshgrid(x, y)
@@ -75,6 +70,7 @@ def normalize(a, new_max=1.0):
 
 
 def read_x_data(data_dir):
+    """read x data into a list of arrays"""
     files = glob.glob(os.path.join(data_dir, '*.jpg'))
     return [(os.path.basename(file), io.imread(file)) for file in files]
 
@@ -90,6 +86,7 @@ def list_of_images_to_4d_array(list_of_image_arrays):
 
 
 def make_datagens(data_points):
+    """make coordinated x and y data generators"""
     data_gen_args = dict(
         rotation_range=10.,
         width_shift_range=0.1,
@@ -147,9 +144,6 @@ def train_valid_test_split(data_points, test_prob, valid_prob, random_state=1234
 
 
 MODEL_CHECKPOINT_NAME = 'model_checkpoint_weights.{epoch:02d}-{val_loss:.2f}.hdf5'
-
-
-from matplotlib import pyplot as plt
 
 
 class SaveYsCallback(keras.callbacks.Callback):
@@ -221,14 +215,8 @@ class PrintYsCallback(keras.callbacks.Callback):
 
             print('y_true[:,:,0] shape: {}, min: {}, max: {}, mean: {}'.format(
                 y0.shape, y0.min(), y0.max(), y0.mean()))
-            print('y_true[:,:,1] shape: {}, min: {}, max: {}, mean: {}'.format(
-                y1.shape, y1.min(), y1.max(), y1.mean()))
-            print()
-
             print('y_pred[:,:,0] max location: row, col = {}, yx = {}'.format(
                 *self._find_max_location_normed(y_pred0)))
-            print('y_pred[:,:,1] max location: row, col = {}, yx = {}'.format(
-                *self._find_max_location_normed(y_pred1)))
             print()
 
             print('y[:,:,0] max location: row, col = {}, yx = {}'.format(
@@ -255,7 +243,7 @@ def get_callbacks(output_dir, x_valid, y_valid):
         keras.callbacks.EarlyStopping(
             monitor='val_loss',
             min_delta=0,
-            patience=30,
+            patience=3 * patience,
             verbose=1,
             mode='auto',
             # baseline=None,
@@ -267,43 +255,49 @@ def get_callbacks(output_dir, x_valid, y_valid):
     return callbacks
 
 
+def build_compile(optimizer, input_height=360, input_width=480, num_classes=2, extra_metrics=[]):
+    model = Deeplabv3(input_shape=(input_height, input_width, 3), classes=num_classes)
+    model.compile(loss="categorical_crossentropy", optimizer=optimizer, metrics=['accuracy'] + extra_metrics)
+    return model
+
+
 if __name__ == '__main__':
     data_dir = './data/'
     do_resize = False
+    load_resized = False
     do_load_model = False
 
     df = pd.read_csv(os.path.join(data_dir, 'labels.txt'), delimiter=' ')
     df.columns = ['image', 'x', 'y']
 
-    # y_px, x_px = utils.get_image_size(data_dir)
+    y_px, x_px = utils.get_image_size(data_dir)
     # print('y_px={}, x_px={}'.format(y_px, x_px))
 
-    y_px, x_px = (320, 480)
+    # y_px, x_px = (320, 480)
     resized_images_dir = os.path.join(data_dir, 'resized_h={}_w={}'.format(y_px, x_px))
     if do_resize:
         resize_images(data_dir, resized_images_dir, y_px, x_px)
 
-    output_dir = os.path.join(data_dir, '../train_output')
+    output_dir = os.path.join(current_dir, 'train_output')
     utils.mkdir_if_not_exist(output_dir)
-
-    # labels_dir = os.path.join(data_dir, 'label_images')
-    # utils.mkdir_if_not_exist(labels_dir)
 
     num_classes = 2
     seed = 1234
 
     batch_size = 1
     lr = 1e-3
-    num_epochs = 100
+    num_epochs = 3
 
     sigma = 0.0005
 
-    # optimizer = keras.optimizers.Adam(lr=lr)
     optimizer = 'adam'
 
-    x_info = read_x_data(resized_images_dir)
+    # read x data
+    x_dir = resized_images_dir if load_resized else data_dir
+    x_info = read_x_data(x_dir)
+    y_px, x_px = utils.get_image_size(x_dir)
 
-    # create y data
+    # create matching y data
     data_points = []
     for file_name, x in x_info:
         row = df[df['image'] == file_name]
@@ -317,19 +311,15 @@ if __name__ == '__main__':
 
     data = train_valid_test_split(data_points, test_prob=0.15, valid_prob=0.15, random_state=seed)
 
-    y_px, x_px = utils.get_image_size(resized_images_dir)
-    num_classes = 2
-    seed = 1234
-
-    model = model_module.build_compile(optimizer, y_px, x_px, extra_metrics=[keras_addons.mode_distance])
-    if do_load_model:
-        keras_addons.load_model(os.path.join(
-            output_dir,
-            MODEL_CHECKPOINT_NAME.format(
-                epoch=12,
-                val_loss=0.06,
-            ))
-        )
+    model = build_compile(optimizer, y_px, x_px, extra_metrics=[keras_addons.mode_distance])
+    # if do_load_model:
+    #     keras_addons.load_model(os.path.join(
+    #         output_dir,
+    #         MODEL_CHECKPOINT_NAME.format(
+    #             epoch=12,
+    #             val_loss=0.06,
+    #         ))
+    #     )
 
     datagens = make_datagens(data[DataSubsets.train])
 
