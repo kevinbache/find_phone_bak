@@ -30,8 +30,8 @@ def keras_find_normed_maxes(tensor):
     col_maxes = K.max(tensor, axis=0)
     row_maxes = K.max(tensor, axis=1)
 
-    normed_col_max = K.argmax(col_maxes) / K.shape(col_maxes)[0]
-    normed_row_max = K.argmax(row_maxes) / K.shape(row_maxes)[0]
+    normed_col_max = K.cast(K.argmax(col_maxes), 'float32') / K.cast(K.shape(col_maxes)[0], 'float32')
+    normed_row_max = K.cast(K.argmax(row_maxes), 'float32') / K.cast(K.shape(row_maxes)[0], 'float32')
 
     return normed_row_max, normed_col_max
 
