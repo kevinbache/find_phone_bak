@@ -21,7 +21,8 @@ def load_model(model_path):
         model_path,
         custom_objects={
             'relu6': relu6,
-            'BilinearUpsampling': BilinearUpsampling
+            'BilinearUpsampling': BilinearUpsampling,
+            'mode_distance': mode_distance,
         }
     )
 
