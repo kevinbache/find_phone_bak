@@ -5,11 +5,12 @@ import sys
 
 current_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(current_dir)
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 from skimage import io
 
-import tensorflow as tf
-tf.logging.set_verbosity(tf.logging.ERROR)
+# import tensorflow as tf
+# tf.logging.set_verbosity(tf.logging.ERROR)
 import keras_addons
 import train_phone_finder
 import utils
