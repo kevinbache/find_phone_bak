@@ -14,12 +14,12 @@ from tensorflow.python import keras
 # from keras import backend as keras
 
 
-def build_compile(optimizer, input_height=360, input_width=480, num_classes=2):
+def build_compile(optimizer, input_height=360, input_width=480, num_classes=2, extra_metrics=[]):
     from deeplab.model import Deeplabv3
     model = Deeplabv3(input_shape=(input_height, input_width, 3), classes=num_classes)
     # for layer in model.layers[:-2]:
     #     layer.trainable = False
-    model.compile(loss="categorical_crossentropy", optimizer=optimizer, metrics=['accuracy'])
+    model.compile(loss="categorical_crossentropy", optimizer=optimizer, metrics=['accuracy'] + extra_metrics)
     return model
 
 

@@ -32,6 +32,7 @@ sys.path.append(current_dir)
 for p in sys.path:
     print(p)
 
+
 class DataSubsets(Enum):
     """Subsets of a data set"""
     train = 1
@@ -320,7 +321,7 @@ if __name__ == '__main__':
     num_classes = 2
     seed = 1234
 
-    model = model_module.build_compile(optimizer, y_px, x_px)
+    model = model_module.build_compile(optimizer, y_px, x_px, keras_addons.mode_distance)
     if do_load_model:
         keras_addons.load_model(os.path.join(
             output_dir,

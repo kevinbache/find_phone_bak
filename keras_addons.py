@@ -18,11 +18,32 @@ def load_model(model_path):
             'BilinearUpsampling': BilinearUpsampling
         }
     )
+from keras import backend as K
 
+
+def keras_find_normed_maxes(tensor):
+    col_maxes = K.max(tensor, axis=0)
+    row_maxes = K.max(tensor, axis=1)
+
+    normed_col_max = K.argmax(col_maxes) / K.shape(col_maxes)[0]
+    normed_row_max = K.argmax(row_maxes) / K.shape(row_maxes)[0]
+
+    return normed_row_max, normed_col_max
+
+
+def keras_distance(p1, p2):
+    return K.sqrt(K.pow(p1[0] - p2[0], 2) + K.pow(p1[1] - p2[1], 2))
+
+
+def mode_distance(y_true, y_pred):
+    return keras_distance(keras_find_normed_maxes(y_true), keras_find_normed_maxes(y_pred))
 
 
 class ReduceLROnPlateau(callbacks.Callback):
-    """Reduce learning rate when a metric has stopped improving.
+    """
+    KBNOTE: THIS IS A VERSION OF ReduceLROnPlateau which has the factor check disabled.
+
+    Reduce learning rate when a metric has stopped improving.
 
     Models often benefit from reducing the learning rate by a factor
     of 2-10 once learning stagnates. This callback monitors a
