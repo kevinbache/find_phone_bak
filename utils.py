@@ -4,6 +4,7 @@ from collections import namedtuple
 from enum import Enum
 from typing import Text
 
+import numpy as np
 from skimage import io
 
 
@@ -53,3 +54,13 @@ def normalize(a, new_max=1.0):
     a = a/a.max()
     a *= new_max
     return a
+
+
+def list_of_images_to_4d_array(list_of_image_arrays):
+    ndim = list_of_image_arrays[0].ndim
+    if ndim == 3:
+        return np.concatenate([im[np.newaxis, :, :, :] for im in list_of_image_arrays], axis=0)
+    elif ndim == 2:
+        return np.concatenate([im[np.newaxis, :, :, np.newaxis] for im in list_of_image_arrays], axis=0)
+    else:
+        raise ValueError('got ndim = {}, only set up to handle 2 and 3'.format(ndim))

@@ -4,6 +4,7 @@ import argparse
 import glob
 import os
 import sys
+
 current_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(current_dir)
 
@@ -18,6 +19,10 @@ from tensorflow.python import keras
 from deeplab.model import Deeplabv3
 import keras_addons
 import utils
+
+MODEL_CHECKPOINT_NAME = 'model_checkpoint_weights.{epoch:02d}.hdf5'
+TRAIN_OUTPUT_DIR = os.path.join(current_dir, 'train_output')
+DATAGENS_FILENAME = os.path.join(TRAIN_OUTPUT_DIR, 'datagens.pkl')
 
 
 def resize_images(input_dir, output_dir, new_height, new_width):
@@ -52,16 +57,6 @@ def read_x_data(data_dir):
     return [(os.path.basename(file), io.imread(file)) for file in files]
 
 
-def list_of_images_to_4d_array(list_of_image_arrays):
-    ndim = list_of_image_arrays[0].ndim
-    if ndim == 3:
-        return np.concatenate([im[np.newaxis, :, :, :] for im in list_of_image_arrays], axis=0)
-    elif ndim == 2:
-        return np.concatenate([im[np.newaxis, :, :, np.newaxis] for im in list_of_image_arrays], axis=0)
-    else:
-        raise ValueError('got ndim = {}, only set up to handle 2 and 3'.format(ndim))
-
-
 def make_datagens(data_points):
     """make coordinated x and y data generators"""
     data_gen_args = dict(
@@ -83,22 +78,22 @@ def make_datagens(data_points):
         **data_gen_args,
     )
 
-    x_datagen.fit(list_of_images_to_4d_array([dp.x for dp in data_points]))
-    y_datagen.fit(list_of_images_to_4d_array([dp.y for dp in data_points]))
+    x_datagen.fit(utils.list_of_images_to_4d_array([dp.x for dp in data_points]))
+    y_datagen.fit(utils.list_of_images_to_4d_array([dp.y for dp in data_points]))
 
     return [x_datagen, y_datagen]
 
 
 def flow_datagens(datagens, data_points, batch_size, seed=1234):
-    """get iterators from the given generators for the given data points"""
+    """get coordinated iterators from the given generators for the given data points"""
     iters = [
         datagens[0].flow(
-            list_of_images_to_4d_array([dp.x for dp in data_points]),
+            utils.list_of_images_to_4d_array([dp.x for dp in data_points]),
             batch_size=batch_size,
             seed=seed,
         ),
         datagens[1].flow(
-            list_of_images_to_4d_array([dp.y for dp in data_points]),
+            utils.list_of_images_to_4d_array([dp.y for dp in data_points]),
             batch_size=batch_size,
             seed=seed,
         )
@@ -117,10 +112,8 @@ def train_valid_test_split(data_points, test_prob, valid_prob, random_state=1234
     }
 
 
-MODEL_CHECKPOINT_NAME = 'model_checkpoint_weights.{epoch:02d}.hdf5'
-
-
 def get_callbacks(output_dir, x_valid, y_valid):
+    """get the callbacks for keras training"""
     patience = 10
     callbacks = [
         keras_addons.ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=patience, min_lr=1e-6),
@@ -146,14 +139,12 @@ def get_callbacks(output_dir, x_valid, y_valid):
     return callbacks
 
 
-def build_compile(optimizer, input_height=360, input_width=480, num_classes=2, extra_metrics=[]):
-    model = Deeplabv3(input_shape=(input_height, input_width, 3), classes=num_classes)
+def build_compile(optimizer, input_height=360, input_width=480, extra_metrics=[]):
+    """build and compile a Keras model.  deeplab"""
+    model = Deeplabv3(input_shape=(input_height, input_width, 3), classes=2)
     model.compile(loss="categorical_crossentropy", optimizer=optimizer, metrics=['accuracy'] + extra_metrics)
     return model
 
-
-TRAIN_OUTPUT_DIR = os.path.join(current_dir, 'train_output')
-DATAGENS_FILENAME = os.path.join(TRAIN_OUTPUT_DIR, 'datagens.pkl')
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
@@ -181,9 +172,6 @@ if __name__ == '__main__':
     lr = 1e-3
     num_epochs = 3
     optimizer = 'adam'
-    # you can't actually change the num_classes parameter because the two-class setup
-    # is baked into y data generation
-    num_classes = 2
     seed = 1234
 
     sigma = 0.0005
@@ -209,12 +197,11 @@ if __name__ == '__main__':
         data_points.append(utils.DataPoint(x=x, y=y, meta=file_name))
 
     data = train_valid_test_split(data_points, test_prob=0.15, valid_prob=0.15, random_state=seed)
-    utils.save_pickle(data, os.path.join(TRAIN_OUTPUT_DIR, 'data_dict.pkl'))
 
     datagens = make_datagens(data[utils.DataSubsets.train])
     utils.save_pickle(datagens, DATAGENS_FILENAME)
 
-    # create images to print in callback
+    # create images to print in training progress callback
     datagens_flow = {subset: flow_datagens(datagens, data[subset], 1, seed)
                      for subset in utils.DataSubsets}
     x_valid_show = []
@@ -234,14 +221,6 @@ if __name__ == '__main__':
     # MODEL / TRAINING #
     ####################
     model = build_compile(optimizer, y_px, x_px, extra_metrics=[keras_addons.mode_distance])
-    # if do_load_model:
-    #     keras_addons.load_model(os.path.join(
-    #         output_dir,
-    #         MODEL_CHECKPOINT_NAME.format(
-    #             epoch=12,
-    #             val_loss=0.06,
-    #         ))
-    #     )
 
     history = model.fit_generator(
         datagens_flow[utils.DataSubsets.train],
