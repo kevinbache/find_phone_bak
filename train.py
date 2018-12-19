@@ -16,6 +16,7 @@ from scipy.stats import multivariate_normal
 from skimage import io
 from sklearn.model_selection import train_test_split
 from tensorflow.python import keras
+from tensorflow.python.keras import backend as K
 
 from deeplab.model import Deeplabv3
 import keras_addons
@@ -151,8 +152,6 @@ def get_callbacks(output_dir, x_valid, y_valid):
             patience=3 * patience,
             verbose=1,
             mode='auto',
-            # baseline=None,
-            # restore_best_weights=False
         ),
         keras_addons.PrintYsCallback(x_valid, y_valid),
         keras_addons.SaveYsCallback(os.path.join(output_dir, 'progress_images'), x_valid, y_valid),
@@ -213,6 +212,7 @@ if __name__ == '__main__':
         data_points.append(DataPoint(x=x, y=y, meta=file_name))
 
     data = train_valid_test_split(data_points, test_prob=0.15, valid_prob=0.15, random_state=seed)
+    utils.save_pickle(data, os.path.join(train_output_dir, 'data_dict.pkl'))
 
     datagens = make_datagens(data[DataSubsets.train])
     datagens_filename = os.path.join(train_output_dir, 'datagens.pkl')
@@ -258,8 +258,9 @@ if __name__ == '__main__':
 
     dists = []
     for dp in data[DataSubsets.test]:
-        y_pred = model.predict(datagens[0].standardize(dp.x), batch_size=1)
-        dist = keras_addons.mode_distance(dp.y, y_pred)
+        x = datagens[0].standardize(dp.x.astype('float32'))[np.newaxis, :, :, :]
+        y_pred = model.predict(x, batch_size=1).squeeze()
+        dist = K.eval(keras_addons.mode_distance(dp.y, y_pred))
         dists.append(dist)
     print("Test set distances:")
     print(dists)

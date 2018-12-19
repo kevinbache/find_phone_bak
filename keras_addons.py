@@ -45,8 +45,8 @@ def keras_distance(p1, p2):
 
 def mode_distance(y_true, y_pred):
     return keras_distance(
-        keras_find_normed_maxes(y_true),
-        keras_find_normed_maxes(y_pred)
+        keras_find_normed_maxes(y_true[:, :, 0]),
+        keras_find_normed_maxes(y_pred[:, :, 0])
     )
 
 
