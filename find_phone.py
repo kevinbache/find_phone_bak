@@ -27,6 +27,6 @@ if __name__ == '__main__':
     model_template = os.path.join(train_phone_finder.TRAIN_OUTPUT_DIR, train_phone_finder.MODEL_CHECKPOINT_NAME)
     model = keras_addons.load_model(model_template.format(epoch=3))
 
-    y_pred = model.predict(x, batch_size=1)
+    y_pred = model.predict(x, batch_size=1).squeeze()
     row, col = keras_addons.find_normed_maxes(y_pred)
     print("{} {}".format(row, col))
