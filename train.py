@@ -4,8 +4,6 @@ import os
 import sys
 current_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(current_dir)
-for p in sys.path:
-    print(p)
 
 import glob
 from enum import Enum
@@ -14,7 +12,6 @@ from collections import namedtuple
 from PIL import Image
 import numpy as np
 import pandas as pd
-from matplotlib import pyplot as plt
 from scipy.stats import multivariate_normal
 from skimage import io
 from sklearn.model_selection import train_test_split
@@ -105,13 +102,10 @@ def make_datagens(data_points):
 
 
 def flow_datagens(datagens, data_points, batch_size, seed=1234):
+    """get iterators from the given generators for the given data points"""
     iters = [
         datagens[0].flow(
             list_of_images_to_4d_array([dp.x for dp in data_points]),
-            # (
-            #     list_of_images_to_4d_array([dp.x for dp in data_points]),
-            #     np.array([dp.meta for dp in data_points]),
-            # ),
             batch_size=batch_size,
             seed=seed,
         ),
