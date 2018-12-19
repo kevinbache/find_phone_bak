@@ -39,6 +39,10 @@ def keras_find_normed_maxes(tensor):
     return normed_row_max, normed_col_max
 
 
+def find_normed_maxes(array: np.array):
+    return K.eval(keras_find_normed_maxes(array))
+
+
 def keras_distance(p1, p2):
     return K.sqrt(K.pow(p1[0] - p2[0], 2) + K.pow(p1[1] - p2[1], 2))
 
@@ -52,9 +56,14 @@ def mode_distance(y_true, y_pred):
 
 def eval_dist(dp: utils.DataPoint, model: keras.models.Model, datagen: keras.preprocessing.image.ImageDataGenerator):
     """returns the distance between predicted location and true location"""
-    x = datagen.standardize(dp.x.astype('float32'))[np.newaxis, :, :, :]
+    x = preproc_x(dp.x, datagen)
     y_pred = model.predict(x, batch_size=1).squeeze()
     return K.eval(mode_distance(dp.y, y_pred))
+
+
+def preproc_x(x: np.array, datagen: keras.preprocessing.image.ImageDataGenerator):
+    """preprocess a single x datapoint"""
+    return datagen.standardize(x.astype('float32'))[np.newaxis, :, :, :]
 
 
 #############

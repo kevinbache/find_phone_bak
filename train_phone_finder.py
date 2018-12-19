@@ -20,15 +20,6 @@ import keras_addons
 import utils
 
 
-ap = argparse.ArgumentParser()
-ap.add_argument(
-    "data_dir",
-    help="path to input data direcotry containing training images and labels.txt",
-)
-args = ap.parse_args()
-print(args.data_dir)
-
-
 def resize_images(input_dir, output_dir, new_height, new_width):
     files = glob.glob(os.path.join(input_dir, '*.jpg'))
     utils.mkdir_if_not_exist(output_dir)
@@ -165,6 +156,13 @@ TRAIN_OUTPUT_DIR = os.path.join(current_dir, 'train_output')
 DATAGENS_FILENAME = os.path.join(TRAIN_OUTPUT_DIR, 'datagens.pkl')
 
 if __name__ == '__main__':
+    ap = argparse.ArgumentParser()
+    ap.add_argument(
+        "data_dir",
+        help="path to input data direcotry containing training images and labels.txt",
+    )
+    args = ap.parse_args()
+
     ##############
     # PARAMETERS #
     ##############
