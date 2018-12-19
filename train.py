@@ -321,7 +321,7 @@ if __name__ == '__main__':
     num_classes = 2
     seed = 1234
 
-    model = model_module.build_compile(optimizer, y_px, x_px, keras_addons.mode_distance)
+    model = model_module.build_compile(optimizer, y_px, x_px, extra_metrics=keras_addons.mode_distance)
     if do_load_model:
         keras_addons.load_model(os.path.join(
             output_dir,

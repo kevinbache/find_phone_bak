@@ -2,14 +2,17 @@ from __future__ import division
 import numpy as np
 import warnings
 
-from keras import callbacks
-from keras import backend as K
 import keras
+from keras import backend as K
+from keras import callbacks
 
 
 from deeplab.model import relu6, BilinearUpsampling
 
 
+########
+# MISC #
+########
 def load_model(model_path):
     return keras.models.load_model(
         model_path,
@@ -18,9 +21,11 @@ def load_model(model_path):
             'BilinearUpsampling': BilinearUpsampling
         }
     )
-from keras import backend as K
 
 
+###########
+# METRICS #
+###########
 def keras_find_normed_maxes(tensor):
     col_maxes = K.max(tensor, axis=0)
     row_maxes = K.max(tensor, axis=1)
@@ -36,9 +41,15 @@ def keras_distance(p1, p2):
 
 
 def mode_distance(y_true, y_pred):
-    return keras_distance(keras_find_normed_maxes(y_true), keras_find_normed_maxes(y_pred))
+    return keras_distance(
+        keras_find_normed_maxes(y_true),
+        keras_find_normed_maxes(y_pred)
+    )
 
 
+#############
+# CALLBACKS #
+#############
 class ReduceLROnPlateau(callbacks.Callback):
     """
     KBNOTE: THIS IS A VERSION OF ReduceLROnPlateau which has the factor check disabled.
