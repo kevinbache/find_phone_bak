@@ -17,7 +17,6 @@ class DataSubsets(Enum):
 DataPoint = namedtuple("DataPoint", ['x', 'y', 'meta'])
 
 
-
 def mkdir_if_not_exist(directory_path):
     if not os.path.isdir(directory_path):
         os.makedirs(directory_path)

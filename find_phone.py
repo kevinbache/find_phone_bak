@@ -23,6 +23,9 @@ if __name__ == '__main__':
     datagens = utils.load_pickle(train_phone_finder.DATAGENS_FILENAME)
     x_raw = io.imread(args.img_file)
     x = keras_addons.preproc_x(x_raw, datagens[0])
+    print(x)
+    print(type(x))
+    print(len(x))
 
     model_template = os.path.join(train_phone_finder.TRAIN_OUTPUT_DIR, train_phone_finder.MODEL_CHECKPOINT_NAME)
     model = keras_addons.load_model(model_template.format(epoch=3))
