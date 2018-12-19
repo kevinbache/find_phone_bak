@@ -29,4 +29,4 @@ if __name__ == '__main__':
 
     y_pred = model.predict(x, batch_size=1).squeeze()[:, :, 0]
     row, col = keras_addons.find_normed_maxes(y_pred)
-    print("{} {}".format(row, col))
+    print("{:0.4f} {:0.4f}".format(col, row))
