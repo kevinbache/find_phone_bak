@@ -9,11 +9,24 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 from skimage import io
 
-# import tensorflow as tf
-# tf.logging.set_verbosity(tf.logging.ERROR)
-import keras_addons
-import train_phone_finder
-import utils
+# this context manager was stolen from
+# https://stackoverflow.com/questions/11130156/suppress-stdout-stderr-print-from-python-functions
+from contextlib import contextmanager, redirect_stderr, redirect_stdout
+from os import devnull
+
+@contextmanager
+def suppress_stdout_stderr():
+    """A context manager that redirects stdout and stderr to devnull"""
+    with open(devnull, 'w') as fnull:
+        with redirect_stderr(fnull) as err, redirect_stdout(fnull) as out:
+            yield (err, out)
+
+
+# suppress "Using TensorFlow backend." message
+with suppress_stdout_stderr():
+    import keras_addons
+    import train_phone_finder
+    import utils
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
