@@ -161,12 +161,15 @@ def build_compile(optimizer, input_height=360, input_width=480, num_classes=2, e
     return model
 
 
+TRAIN_OUTPUT_DIR = os.path.join(current_dir, 'train_output')
+DATAGENS_FILENAME = os.path.join(TRAIN_OUTPUT_DIR, 'datagens.pkl')
+
 if __name__ == '__main__':
     ##############
     # PARAMETERS #
     ##############
     # data_dir = './data/'
-    data_dir = args.data_dir
+    data_dir = os.path.join(current_dir, args.data_dir)
     do_resize = False
     load_resized = False
     do_load_model = False
@@ -174,8 +177,7 @@ if __name__ == '__main__':
     df = pd.read_csv(os.path.join(data_dir, 'labels.txt'), delimiter=' ')
     df.columns = ['image', 'x', 'y']
 
-    train_output_dir = os.path.join(current_dir, 'train_output')
-    utils.mkdir_if_not_exist(train_output_dir)
+    utils.mkdir_if_not_exist(TRAIN_OUTPUT_DIR)
 
     batch_size = 1
     lr = 1e-3
@@ -209,11 +211,10 @@ if __name__ == '__main__':
         data_points.append(utils.DataPoint(x=x, y=y, meta=file_name))
 
     data = train_valid_test_split(data_points, test_prob=0.15, valid_prob=0.15, random_state=seed)
-    utils.save_pickle(data, os.path.join(train_output_dir, 'data_dict.pkl'))
+    utils.save_pickle(data, os.path.join(TRAIN_OUTPUT_DIR, 'data_dict.pkl'))
 
     datagens = make_datagens(data[utils.DataSubsets.train])
-    datagens_filename = os.path.join(train_output_dir, 'datagens.pkl')
-    utils.save_pickle(datagens, datagens_filename)
+    utils.save_pickle(datagens, DATAGENS_FILENAME)
 
     # create images to print in callback
     datagens_flow = {subset: flow_datagens(datagens, data[subset], 1, seed)
@@ -250,13 +251,13 @@ if __name__ == '__main__':
         epochs=num_epochs,
         validation_data=datagens_flow[utils.DataSubsets.valid],
         validation_steps=len(data[utils.DataSubsets.valid]) / batch_size,
-        callbacks=get_callbacks(train_output_dir, x_valid_show, y_valid_show),
+        callbacks=get_callbacks(TRAIN_OUTPUT_DIR, x_valid_show, y_valid_show),
     )
 
     ###################
     # TEST EVALUATION #
     ###################
-    dists = [keras_addons.eval_dist(dp, model) for dp in data[utils.DataSubsets.test]]
+    dists = [keras_addons.eval_dist(dp, model, datagens[0]) for dp in data[utils.DataSubsets.test]]
     print("Test set distances:")
     print(dists)
     print('Mean distance: {}'.format(np.mean(dists)))
