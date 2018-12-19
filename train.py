@@ -349,7 +349,6 @@ if __name__ == '__main__':
                      for subset in DataSubsets}
 
     steps_per_epoch = len(data[DataSubsets.train]) / batch_size
-    # steps_per_epoch = 2
     history = model.fit_generator(
         datagens_flow[DataSubsets.train],
         steps_per_epoch=steps_per_epoch,
