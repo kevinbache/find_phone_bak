@@ -10,7 +10,7 @@ from skimage import io
 
 import keras_addons
 import train_phone_finder
-
+import utils
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
@@ -20,8 +20,9 @@ if __name__ == '__main__':
     )
     args = ap.parse_args()
 
+    datagens = utils.load_pickle(train_phone_finder.DATAGENS_FILENAME)
     x_raw = io.imread(args.img_file)
-    x = keras_addons.preproc_x(x_raw)
+    x = keras_addons.preproc_x(x_raw, datagens[0])
 
     model_template = os.path.join(train_phone_finder.TRAIN_OUTPUT_DIR, train_phone_finder.MODEL_CHECKPOINT_NAME)
     model = keras_addons.load_model(model_template.format(epoch=3))
