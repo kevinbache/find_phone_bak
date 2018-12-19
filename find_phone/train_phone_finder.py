@@ -140,7 +140,7 @@ def get_callbacks(output_dir, x_valid, y_valid):
 
 
 def build_compile(optimizer, input_height=360, input_width=480, extra_metrics=[]):
-    """build and compile a Keras model.  deeplab"""
+    """build and compile a Keras model.  deeplab was taken from https://github.com/bonlime/keras-deeplab-v3-plus"""
     model = Deeplabv3(input_shape=(input_height, input_width, 3), classes=2)
     model.compile(loss="categorical_crossentropy", optimizer=optimizer, metrics=['accuracy'] + extra_metrics)
     return model
