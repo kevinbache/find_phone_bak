@@ -61,14 +61,6 @@ def make_gaussian_label_image(mu_x, mu_y, num_x_px, num_y_px, var=0.05):
     return rv.pdf(locs_reshaped).reshape(locs.shape[:-1])
 
 
-def normalize(a, new_max=1.0):
-    """normalize the values in the input array to the range [0, new_max]"""
-    a = (a - a.min())
-    a = a/a.max()
-    a *= new_max
-    return a
-
-
 def read_x_data(data_dir):
     """read x data into a list of arrays"""
     files = glob.glob(os.path.join(data_dir, '*.jpg'))
@@ -146,87 +138,6 @@ def train_valid_test_split(data_points, test_prob, valid_prob, random_state=1234
 MODEL_CHECKPOINT_NAME = 'model_checkpoint_weights.{epoch:02d}-{val_loss:.2f}.hdf5'
 
 
-class SaveYsCallback(keras.callbacks.Callback):
-    OUTPUT_IMAGE_TEMPLATE = 'training_progress_epoch={}_img={}.jpg'
-
-    def __init__(self, output_path, x_images, y_images):
-        self.x_images = x_images
-        self.y_images = y_images
-        self.output_path = output_path
-        utils.mkdir_if_not_exist(self.output_path)
-
-    def on_epoch_end(self, epoch, logs=None):
-        for i, (x, y) in enumerate(zip(self.x_images, self.y_images)):
-            out_path = os.path.join(self.output_path, self.OUTPUT_IMAGE_TEMPLATE.format(epoch, i))
-            print("Saving image {} of {} to {}".format(i, len(self.x_images)-1, out_path))
-            y_pred = self.model.predict(x)
-            f, ax = plt.subplots(1, 3)
-
-            x = x.squeeze()
-            for ci in range(x.shape[2]):
-                channel = x[:, :, ci]
-                channel -= channel.min()
-                x[:, :, ci] = normalize(channel)
-
-            ax[0].imshow(x)
-            ax[1].imshow(y_pred[0, :, :, 0])
-            ax[2].imshow(y[0, :, :, 0])
-            f.savefig(out_path)
-            plt.close()
-
-
-class PrintYsCallback(keras.callbacks.Callback):
-    def __init__(self, x_images, y_images):
-        self.x_images = x_images
-        self.y_images = y_images
-
-    @staticmethod
-    def _find_max_location_normed(array):
-        col_maxes = array.max(axis=0)
-        row_maxes = array.max(axis=1)
-        return (row_maxes.argmax(), col_maxes.argmax()), \
-               (row_maxes.argmax() / len(row_maxes), col_maxes.argmax() / len(col_maxes))
-
-    def on_epoch_end(self, epoch, logs=None):
-        for i, (x, y) in enumerate(zip(self.x_images, self.y_images)):
-            print("==========================")
-            print(" Starting image {} of {}".format(i, len(self.x_images)))
-            print("==========================")
-            y_pred = self.model.predict(x)
-
-            y_pred = y_pred.squeeze()
-            y = y.squeeze()
-
-            print("y_pred: ")
-            print(y_pred)
-            print("y_true: ")
-            print(y)
-
-            y_pred0 = y_pred[:, :, 0]
-            y_pred1 = y_pred[:, :, 1]
-            y0 = y[:, :, 0]
-            y1 = y[:, :, 1]
-
-            print('y_pred[:,:,0] shape: {}, min: {}, max: {}, mean: {}'.format(
-                y_pred0.shape, y_pred0.min(), y_pred0.max(), y_pred0.mean()))
-            print('y_pred[:,:,1] shape: {}, min: {}, max: {}, mean: {}'.format(
-                y_pred1.shape, y_pred1.min(), y_pred1.max(), y_pred1.mean()))
-            print()
-
-            print('y_true[:,:,0] shape: {}, min: {}, max: {}, mean: {}'.format(
-                y0.shape, y0.min(), y0.max(), y0.mean()))
-            print('y_pred[:,:,0] max location: row, col = {}, yx = {}'.format(
-                *self._find_max_location_normed(y_pred0)))
-            print()
-
-            print('y[:,:,0] max location: row, col = {}, yx = {}'.format(
-                *self._find_max_location_normed(y0)))
-            print('y[:,:,1] max location: row, col = {}, yx = {}'.format(
-                *self._find_max_location_normed(y1)))
-            print()
-            print()
-
-
 def get_callbacks(output_dir, x_valid, y_valid):
     patience = 10
     callbacks = [
@@ -249,8 +160,8 @@ def get_callbacks(output_dir, x_valid, y_valid):
             # baseline=None,
             # restore_best_weights=False
         ),
-        PrintYsCallback(x_valid, y_valid),
-        SaveYsCallback(os.path.join(output_dir, 'progress_images'), x_valid, y_valid),
+        keras_addons.PrintYsCallback(x_valid, y_valid),
+        keras_addons.SaveYsCallback(os.path.join(output_dir, 'progress_images'), x_valid, y_valid),
     ]
     return callbacks
 
@@ -278,8 +189,8 @@ if __name__ == '__main__':
     if do_resize:
         resize_images(data_dir, resized_images_dir, y_px, x_px)
 
-    output_dir = os.path.join(current_dir, 'train_output')
-    utils.mkdir_if_not_exist(output_dir)
+    train_output_dir = os.path.join(current_dir, 'train_output')
+    utils.mkdir_if_not_exist(train_output_dir)
 
     num_classes = 2
     seed = 1234
@@ -304,7 +215,7 @@ if __name__ == '__main__':
         if len(row) == 0:
             continue
         y = make_gaussian_label_image(row['x'].values[0], row['y'].values[0], x_px, y_px, sigma)
-        y = normalize(y)
+        y = utils.normalize(y)
         y = y[:, :, np.newaxis]
         y = np.concatenate([y, 1 - y.copy()], axis=2)
         data_points.append(DataPoint(x=x, y=y, meta=file_name))
@@ -322,15 +233,17 @@ if __name__ == '__main__':
     #     )
 
     datagens = make_datagens(data[DataSubsets.train])
+    datagens_filename = os.path.join(train_output_dir, 'datagens.pkl')
+    utils.save_pickle(datagens, datagens_filename)
 
     # create images to print in callback
     datagens_flow = {subset: flow_datagens(datagens, data[subset], 1, seed)
                      for subset in DataSubsets}
     x_valid_show = []
     y_valid_show = []
-    num_images_to_show = 2
+    num_images_to_show = 5
     for i, (x, y) in enumerate(datagens_flow[DataSubsets.valid]):
-        if i >= num_images_to_show:
+        if i == num_images_to_show:
             break
         x_valid_show.append(x)
         y_valid_show.append(y)
@@ -346,7 +259,7 @@ if __name__ == '__main__':
         epochs=num_epochs,
         validation_data=datagens_flow[DataSubsets.valid],
         validation_steps=len(data[DataSubsets.valid]) / batch_size,
-        callbacks=get_callbacks(output_dir, x_valid_show, y_valid_show),
+        callbacks=get_callbacks(train_output_dir, x_valid_show, y_valid_show),
     )
 
     print(history)

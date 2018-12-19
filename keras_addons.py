@@ -1,14 +1,16 @@
 from __future__ import division
-import numpy as np
+import os
 import warnings
+
+import numpy as np
+from matplotlib import pyplot as plt
 
 import keras
 from keras import backend as K
 from keras import callbacks
 
-
 from deeplab.model import relu6, BilinearUpsampling
-
+import utils
 
 ########
 # MISC #
@@ -173,4 +175,85 @@ class ReduceLROnPlateau(callbacks.Callback):
 
     def in_cooldown(self):
         return self.cooldown_counter > 0
+
+
+class SaveYsCallback(keras.callbacks.Callback):
+    OUTPUT_IMAGE_TEMPLATE = 'training_progress_epoch={}_img={}.jpg'
+
+    def __init__(self, output_path, x_images, y_images):
+        self.x_images = x_images
+        self.y_images = y_images
+        self.output_path = output_path
+        utils.mkdir_if_not_exist(self.output_path)
+
+    def on_epoch_end(self, epoch, logs=None):
+        for i, (x, y) in enumerate(zip(self.x_images, self.y_images)):
+            out_path = os.path.join(self.output_path, self.OUTPUT_IMAGE_TEMPLATE.format(epoch, i))
+            print("Saving image {} of {} to {}".format(i, len(self.x_images)-1, out_path))
+            y_pred = self.model.predict(x)
+            f, ax = plt.subplots(1, 3)
+
+            x = x.squeeze()
+            for ci in range(x.shape[2]):
+                channel = x[:, :, ci]
+                channel -= channel.min()
+                x[:, :, ci] = utils.normalize(channel)
+
+            ax[0].imshow(x)
+            ax[1].imshow(y_pred[0, :, :, 0])
+            ax[2].imshow(y[0, :, :, 0])
+            f.savefig(out_path)
+            plt.close()
+
+
+class PrintYsCallback(keras.callbacks.Callback):
+    """Debug helper callback which prints stats on y variables"""
+    def __init__(self, x_images, y_images):
+        self.x_images = x_images
+        self.y_images = y_images
+
+    @staticmethod
+    def _find_max_location_normed(array):
+        col_maxes = array.max(axis=0)
+        row_maxes = array.max(axis=1)
+        return (row_maxes.argmax(), col_maxes.argmax()), \
+               (row_maxes.argmax() / len(row_maxes), col_maxes.argmax() / len(col_maxes))
+
+    def on_epoch_end(self, epoch, logs=None):
+        for i, (x, y) in enumerate(zip(self.x_images, self.y_images)):
+            print("==========================")
+            print(" Starting image {} of {}".format(i, len(self.x_images)))
+            print("==========================")
+            y_pred = self.model.predict(x)
+
+            y_pred = y_pred.squeeze()
+            y = y.squeeze()
+
+            y_pred0 = y_pred[:, :, 0]
+            y_pred1 = y_pred[:, :, 1]
+            y0 = y[:, :, 0]
+            y1 = y[:, :, 1]
+
+            print('y_pred[:,:,1] shape: {}, min: {}, max: {}, mean: {}'.format(
+                y_pred1.shape, y_pred1.min(), y_pred1.max(), y_pred1.mean()))
+            print('y_true[:,:,1] shape: {}, min: {}, max: {}, mean: {}'.format(
+                y1.shape, y1.min(), y1.max(), y1.mean()))
+
+            print('y_pred[:,:,1] max location: row, col = {}, yx = {}'.format(
+                *self._find_max_location_normed(y_pred1)))
+            print('y[:,:,1]      max location: row, col = {}, yx = {}'.format(
+                *self._find_max_location_normed(y1)))
+            print()
+
+            print('y_pred[:,:,0] shape: {}, min: {}, max: {}, mean: {}'.format(
+                y_pred0.shape, y_pred0.min(), y_pred0.max(), y_pred0.mean()))
+            print('y_true[:,:,0] shape: {}, min: {}, max: {}, mean: {}'.format(
+                y0.shape, y0.min(), y0.max(), y0.mean()))
+
+            print('y_pred[:,:,0] max location: row, col = {}, yx = {}'.format(
+                *self._find_max_location_normed(y_pred0)))
+            print('y[:,:,0]      max location: row, col = {}, yx = {}'.format(
+                *self._find_max_location_normed(y0)))
+            print()
+            print()
 
