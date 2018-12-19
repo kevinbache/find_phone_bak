@@ -8,12 +8,11 @@ sys.path.append(current_dir)
 
 from skimage import io
 
+import tensorflow as tf
+tf.logging.set_verbosity(tf.logging.ERROR)
 import keras_addons
 import train_phone_finder
 import utils
-
-import tensorflow as tf
-tf.logging.set_verbosity(tf.logging.ERROR)
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
