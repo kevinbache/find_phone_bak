@@ -1,8 +1,21 @@
 import os
 import pickle
+from collections import namedtuple
+from enum import Enum
 from typing import Text
 
 from skimage import io
+
+
+class DataSubsets(Enum):
+    """Subsets of a data set"""
+    train = 1
+    valid = 2
+    test = 3
+
+
+DataPoint = namedtuple("DataPoint", ['x', 'y', 'meta'])
+
 
 
 def mkdir_if_not_exist(directory_path):

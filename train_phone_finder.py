@@ -1,13 +1,11 @@
 from __future__ import division
 
+import argparse
+import glob
 import os
 import sys
 current_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(current_dir)
-
-import glob
-from enum import Enum
-from collections import namedtuple
 
 from PIL import Image
 import numpy as np
@@ -16,21 +14,19 @@ from scipy.stats import multivariate_normal
 from skimage import io
 from sklearn.model_selection import train_test_split
 from tensorflow.python import keras
-from tensorflow.python.keras import backend as K
 
 from deeplab.model import Deeplabv3
 import keras_addons
 import utils
 
 
-class DataSubsets(Enum):
-    """Subsets of a data set"""
-    train = 1
-    valid = 2
-    test = 3
-
-
-DataPoint = namedtuple("DataPoint", ['x', 'y', 'meta'])
+ap = argparse.ArgumentParser()
+ap.add_argument(
+    "data_dir",
+    help="path to input data direcotry containing training images and labels.txt",
+)
+args = ap.parse_args()
+print(args.data_dir)
 
 
 def resize_images(input_dir, output_dir, new_height, new_width):
@@ -124,9 +120,9 @@ def train_valid_test_split(data_points, test_prob, valid_prob, random_state=1234
     train, valid = train_test_split(data_points, test_size=valid_prob, random_state=random_state)
     train, test = train_test_split(train, test_size=test_prob_full, random_state=random_state)
     return {
-        DataSubsets.train: train,
-        DataSubsets.valid: valid,
-        DataSubsets.test: test,
+        utils.DataSubsets.train: train,
+        utils.DataSubsets.valid: valid,
+        utils.DataSubsets.test: test,
     }
 
 
@@ -169,7 +165,8 @@ if __name__ == '__main__':
     ##############
     # PARAMETERS #
     ##############
-    data_dir = './data/'
+    # data_dir = './data/'
+    data_dir = args.data_dir
     do_resize = False
     load_resized = False
     do_load_model = False
@@ -209,22 +206,22 @@ if __name__ == '__main__':
         y = y[:, :, np.newaxis]
         # note that this hard codes two classes
         y = np.concatenate([y, 1 - y.copy()], axis=2)
-        data_points.append(DataPoint(x=x, y=y, meta=file_name))
+        data_points.append(utils.DataPoint(x=x, y=y, meta=file_name))
 
     data = train_valid_test_split(data_points, test_prob=0.15, valid_prob=0.15, random_state=seed)
     utils.save_pickle(data, os.path.join(train_output_dir, 'data_dict.pkl'))
 
-    datagens = make_datagens(data[DataSubsets.train])
+    datagens = make_datagens(data[utils.DataSubsets.train])
     datagens_filename = os.path.join(train_output_dir, 'datagens.pkl')
     utils.save_pickle(datagens, datagens_filename)
 
     # create images to print in callback
     datagens_flow = {subset: flow_datagens(datagens, data[subset], 1, seed)
-                     for subset in DataSubsets}
+                     for subset in utils.DataSubsets}
     x_valid_show = []
     y_valid_show = []
     num_images_to_show = 5
-    for i, (x, y) in enumerate(datagens_flow[DataSubsets.valid]):
+    for i, (x, y) in enumerate(datagens_flow[utils.DataSubsets.valid]):
         if i == num_images_to_show:
             break
         x_valid_show.append(x)
@@ -232,7 +229,7 @@ if __name__ == '__main__':
 
     # reset data generators for training
     datagens_flow = {subset: flow_datagens(datagens, data[subset], batch_size, seed)
-                     for subset in DataSubsets}
+                     for subset in utils.DataSubsets}
 
     ####################
     # MODEL / TRAINING #
@@ -248,20 +245,18 @@ if __name__ == '__main__':
     #     )
 
     history = model.fit_generator(
-        datagens_flow[DataSubsets.train],
-        steps_per_epoch=len(data[DataSubsets.train]) / batch_size,
+        datagens_flow[utils.DataSubsets.train],
+        steps_per_epoch=len(data[utils.DataSubsets.train]) / batch_size,
         epochs=num_epochs,
-        validation_data=datagens_flow[DataSubsets.valid],
-        validation_steps=len(data[DataSubsets.valid]) / batch_size,
+        validation_data=datagens_flow[utils.DataSubsets.valid],
+        validation_steps=len(data[utils.DataSubsets.valid]) / batch_size,
         callbacks=get_callbacks(train_output_dir, x_valid_show, y_valid_show),
     )
 
-    dists = []
-    for dp in data[DataSubsets.test]:
-        x = datagens[0].standardize(dp.x.astype('float32'))[np.newaxis, :, :, :]
-        y_pred = model.predict(x, batch_size=1).squeeze()
-        dist = K.eval(keras_addons.mode_distance(dp.y, y_pred))
-        dists.append(dist)
+    ###################
+    # TEST EVALUATION #
+    ###################
+    dists = [keras_addons.eval_dist(dp, model) for dp in data[utils.DataSubsets.test]]
     print("Test set distances:")
     print(dists)
     print('Mean distance: {}'.format(np.mean(dists)))

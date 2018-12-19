@@ -50,6 +50,13 @@ def mode_distance(y_true, y_pred):
     )
 
 
+def eval_dist(dp: utils.DataPoint, model: keras.models.Model, datagen: keras.preprocessing.image.ImageDataGenerator):
+    """returns the distance between predicted location and true location"""
+    x = datagen.standardize(dp.x.astype('float32'))[np.newaxis, :, :, :]
+    y_pred = model.predict(x, batch_size=1).squeeze()
+    return K.eval(mode_distance(dp.y, y_pred))
+
+
 #############
 # CALLBACKS #
 #############
