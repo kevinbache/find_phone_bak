@@ -41,7 +41,7 @@ def keras_find_normed_maxes(tensor):
 
 
 def find_normed_maxes(array: np.array):
-    return K.eval(e for e in keras_find_normed_maxes(array))
+    return [K.eval(e) for e in keras_find_normed_maxes(array)]
 
 
 def keras_distance(p1, p2):
