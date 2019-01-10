@@ -14,6 +14,7 @@ from skimage import io
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from os import devnull
 
+
 @contextmanager
 def suppress_stdout_stderr():
     """A context manager that redirects stdout and stderr to devnull"""
