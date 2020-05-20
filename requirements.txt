@@ -74,7 +74,7 @@ h5py==2.8.0
 hdfs==2.2.1
 horovod==0.15.2
 html5lib==1.0.1
-httplib2==0.11.3
+httplib2==0.18.0
 icc-rt==2019.0
 idna==2.8
 intel-numpy==1.15.1
